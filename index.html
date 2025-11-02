@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TreeHouse Bakery - Order Now!</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; }
+    .menu-category { color: #dc3545; border-bottom: 2px solid #dc3545; padding-bottom: 5px; margin-top: 20px; }
+    .menu-item { background-color: white; transition: background-color 0.2s; }
+    .menu-item:hover { background-color: #f1f1f1; }
+    .cart-section { border: 1px solid #ddd; border-radius: 8px; }
+    .cart-item { background-color: #fff; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; border-radius: 5px; }
+    @media (max-width: 768px) { .menu-category { font-size: 1.2rem; } }
+    .admin-link { text-align: center; margin-top: 10px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+  <div class="container-fluid p-0">
+    <!-- Header -->
+    <header class="bg-dark text-white text-center py-3">
+      <h1>TreeHouse Bakery</h1>
+      <p>Scan QR • Order • Delivered to Your Room</p>
+    </header>
+
+    <!-- Menu Categories -->
+    <div class="row g-3 p-3">
+      <div class="col-12 col-md-6 col-lg-4">
+        <h3 class="menu-category">🍕 Pizza</h3>
+        <div id="pizza-menu" class="menu-items"></div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <h3 class="menu-category">🍔 Burger</h3>
+        <div id="burger-menu" class="menu-items"></div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <h3 class="menu-category">🥪 Sandwich</h3>
+        <div id="sandwich-menu" class="menu-items"></div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <h3 class="menu-category">🧇 Waffles & Shake</h3>
+        <div id="waffle-menu" class="menu-items"></div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <h3 class="menu-category">☕ Tea/Coffee & More</h3>
+        <div id="tea-menu" class="menu-items"></div>
+      </div>
+    </div>
+
+    <!-- Cart Section -->
+    <div class="cart-section bg-light p-3 mt-4">
+      <h4>Your Order</h4>
+      <div id="cart-items" class="mb-3"></div>
+      <div class="d-flex justify-content-between mb-3">
+        <strong>Total:</strong>
+        <span id="cart-total">₹0</span>
+      </div>
+      <div class="mb-3">
+        <input type="text" id="customer-name" class="form-control mb-2" placeholder="Your Full Name" required>
+        <input type="tel" id="customer-phone" class="form-control mb-2" placeholder="Phone Number" required>
+        <input type="text" id="room-number" class="form-control mb-2" placeholder="Hotel Room Number" required>
+      </div>
+      <button id="pay-button" class="btn btn-success w-100">Pay via UPI →</button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white text-center py-3 mt-4">
+      <p>© 2025 TreeHouse Bakery | Scan QR in Your Hotel Room</p>
+      <p class="admin-link"><a href="admin.html" style="color: #dc3545; font-size: 0.8rem; text-decoration: underline;">Admin Login</a></p>
+    </footer>
+  </div>
+
+  <!-- Audio Alert -->
+  <audio id="buzz-sound" src="assets/buzz.mp3" preload="auto"></audio>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Initialize Firebase (Replace with your config later)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAaet1l1-eryjGpeGgMDZriQT7KEW1AlyE",
+      authDomain: "treehouse-f45df.firebaseapp.com",
+      databaseURL: "https://treehouse-f45df-default-rtdb.firebaseio.com",
+      projectId:  "treehouse-f45df",
+      storageBucket: "treehouse-f45df.firebasestorage.app",
+      messagingSenderId: "233268455151",
+      appId: "1:233268455151:web:1341a86984e416ec475d1a",
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // Global Variables
+  let cart = [];
+  const menuData = [
+    // PIZZA
+    { id: 1, name: "Margherita Pizza", category: "pizza", price: 180, outOfStock: false },
+    { id: 2, name: "Veg Cheese Pizza", category: "pizza", price: 200, outOfStock: false },
+    { id: 3, name: "Farmhouse Pizza", category: "pizza", price: 220, outOfStock: false },
+    { id: 4, name: "Peppy Pizza", category: "pizza", price: 220, outOfStock: false },
+    { id: 5, name: "Veg Extra Vagan Pizza", category: "pizza", price: 250, outOfStock: false },
+    { id: 6, name: "Cheese & Corn Pizza", category: "pizza", price: 250, outOfStock: false },
+    { id: 7, name: "Mexican Paneer Pizza", category: "pizza", price: 220, outOfStock: false },
+    { id: 8, name: "Peri Peri Paneer Pizza", category: "pizza", price: 220, outOfStock: false },
+    { id: 9, name: "Italian Pizza", category: "pizza", price: 250, outOfStock: false },
+    { id: 10, name: "Paneer Tikka Pizza", category: "pizza", price: 250, outOfStock: false },
+    { id: 11, name: "Mushroom & Corn Pizza", category: "pizza", price: 220, outOfStock: false },
+    { id: 12, name: "Treehouse Special Pizza", category: "pizza", price: 300, outOfStock: false },
+    // NON VEG PIZZA
+    { id: 13, name: "Chik. Golden Delight", category: "pizza", price: 300, outOfStock: false },
+    { id: 14, name: "Chicken Supreme", category: "pizza", price: 350, outOfStock: false },
+    { id: 15, name: "Chicken Dominator", category: "pizza", price: 350, outOfStock: false },
+    { id: 16, name: "Chicken Pepperoni", category: "pizza", price: 300, outOfStock: false },
+    { id: 17, name: "Peri Peri Chicken", category: "pizza", price: 300, outOfStock: false },
+    { id: 18, name: "Chicken Tikka Pizza", category: "pizza", price: 350, outOfStock: false },
+    // BURGER
+    { id: 19, name: "BBQ Paneer Burger", category: "burger", price: 150, outOfStock: false },
+    { id: 20, name: "Peri Peri Paneer Burger", category: "burger", price: 150, outOfStock: false },
+    { id: 21, name: "Cheese Burger", category: "burger", price: 180, outOfStock: false },
+    { id: 22, name: "Veg Paneer Burger", category: "burger", price: 150, outOfStock: false },
+    { id: 23, name: "Corn Tikki Burger", category: "burger", price: 120, outOfStock: false },
+    { id: 24, name: "Veg Burger", category: "burger", price: 90, outOfStock: false },
+    { id: 25, name: "Peri Peri Chicken Burger", category: "burger", price: 200, outOfStock: false },
+    { id: 26, name: "BBQ Chicken Burger", category: "burger", price: 200, outOfStock: false },
+    { id: 27, name: "Hot Garlic Chicken Burger", category: "burger", price: 200, outOfStock: false },
+    { id: 28, name: "Chicken Supreme Burger", category: "burger", price: 250, outOfStock: false },
+    { id: 29, name: "Maharaja Chicken Burger", category: "burger", price: 250, outOfStock: false },
+    { id: 30, name: "Chicken Burger", category: "burger", price: 140, outOfStock: false },
+    // SANDWICH
+    { id: 31, name: "Veg Cheese S/W", category: "sandwich", price: 60, outOfStock: false },
+    { id: 32, name: "Veg Cheese Toast S/W", category: "sandwich", price: 90, outOfStock: false },
+    { id: 33, name: "Chutney S/W", category: "sandwich", price: 100, outOfStock: false },
+    { id: 34, name: "Club S/W", category: "sandwich", price: 60, outOfStock: false },
+    { id: 35, name: "Veg Cheese Grilled S/W", category: "sandwich", price: 180, outOfStock: false },
+    { id: 36, name: "Paneer Tikka S/W", category: "sandwich", price: 150, outOfStock: false },
+    { id: 37, name: "Peri Peri Paneer S/W", category: "sandwich", price: 160, outOfStock: false },
+    { id: 38, name: "Mexican Paneer S/W", category: "sandwich", price: 180, outOfStock: false },
+    { id: 39, name: "Tomato Toast S/W", category: "sandwich", price: 100, outOfStock: false },
+    { id: 40, name: "Potato Toast S/W", category: "sandwich", price: 100, outOfStock: false },
+    { id: 41, name: "Chocolate S/W", category: "sandwich", price: 180, outOfStock: false },
+    { id: 42, name: "Bombay Masala S/W", category: "sandwich", price: 150, outOfStock: false },
+    { id: 43, name: "Cheese Chilly Toast", category: "sandwich", price: 160, outOfStock: false },
+    { id: 44, name: "Cheese Chilly Garlic Toast", category: "sandwich", price: 180, outOfStock: false },
+    // NON VEG SANDWICH
+    { id: 45, name: "Chicken Cheese S/W", category: "sandwich", price: 100, outOfStock: false },
+    { id: 46, name: "Chicken Cheese S/W", category: "sandwich", price: 140, outOfStock: false },
+    { id: 47, name: "Chicken Cheese Toast S/W", category: "sandwich", price: 150, outOfStock: false },
+    { id: 48, name: "Club Chicken S/W", category: "sandwich", price: 220, outOfStock: false },
+    { id: 49, name: "Chicken Cheese Grilled S/W", category: "sandwich", price: 220, outOfStock: false },
+    { id: 50, name: "Chicken Tikka S/W", category: "sandwich", price: 200, outOfStock: false },
+    { id: 51, name: "Peri Peri Chicken S/W", category: "sandwich", price: 200, outOfStock: false },
+    { id: 52, name: "Mexican Chicken S/W", category: "sandwich", price: 200, outOfStock: false },
+    { id: 53, name: "Chicken Cheese Chilly S/W", category: "sandwich", price: 200, outOfStock: false },
+    { id: 54, name: "Chik. Cheese Chilly Garlic Toast", category: "sandwich", price: 210, outOfStock: false },
+    // WAFFLES & SHAKE
+    { id: 55, name: "Classic Honey Butter", category: "waffle", price: 100, outOfStock: false },
+    { id: 56, name: "Maple Butter", category: "waffle", price: 100, outOfStock: false },
+    { id: 57, name: "Vanilla Waffles", category: "waffle", price: 140, outOfStock: false },
+    { id: 58, name: "Belgian Chocolate", category: "waffle", price: 140, outOfStock: false },
+    { id: 59, name: "Kit Kat", category: "waffle", price: 140, outOfStock: false },
+    { id: 60, name: "Nutella", category: "waffle", price: 140, outOfStock: false },
+    { id: 61, name: "Snickers", category: "waffle", price: 140, outOfStock: false },
+    { id: 62, name: "Coffee Mocha", category: "waffle", price: 140, outOfStock: false },
+    { id: 63, name: "Hazelnut", category: "waffle", price: 140, outOfStock: false },
+    { id: 64, name: "Chocolate Dark/Milk", category: "waffle", price: 140, outOfStock: false },
+    { id: 65, name: "Butter Scotch Crunch", category: "waffle", price: 140, outOfStock: false },
+    { id: 66, name: "Milky Coconut", category: "waffle", price: 140, outOfStock: false },
+    { id: 67, name: "Triple Chocolate", category: "waffle", price: 140, outOfStock: false },
+    { id: 68, name: "Chocolate Waffles", category: "waffle", price: 150, outOfStock: false },
+    { id: 69, name: "Strawberry Cream Cheese", category: "waffle", price: 160, outOfStock: false },
+    { id: 70, name: "Blueberry Cream Cheese", category: "waffle", price: 160, outOfStock: false },
+    { id: 71, name: "Red Velvet Cream Cheese", category: "waffle", price: 160, outOfStock: false },
+    { id: 72, name: "Cookies Cream", category: "waffle", price: 160, outOfStock: false },
+    { id: 73, name: "Waffle Cake", category: "waffle", price: 300, outOfStock: false },
+    { id: 74, name: "Triple Chocolate", category: "waffle", price: 370, outOfStock: false },
+    { id: 75, name: "Red Velvet", category: "waffle", price: 340, outOfStock: false },
+    { id: 76, name: "Nutella", category: "waffle", price: 340, outOfStock: false },
+    { id: 77, name: "Shake", category: "waffle", price: 120, outOfStock: false },
+    { id: 78, name: "Executive Cold Coffee", category: "waffle", price: 120, outOfStock: false },
+    { id: 79, name: "Banana Peanut Butter", category: "waffle", price: 120, outOfStock: false },
+    { id: 80, name: "Oreo Shake", category: "waffle", price: 120, outOfStock: false },
+    { id: 81, name: "Red Velvet", category: "waffle", price: 120, outOfStock: false },
+    { id: 82, name: "KitKat", category: "waffle", price: 120, outOfStock: false },
+    { id: 83, name: "Nutella", category: "waffle", price: 120, outOfStock: false },
+    { id: 84, name: "Belgium Chocolate", category: "waffle", price: 120, outOfStock: false },
+    // TEA/COFFEE & MORE
+    { id: 85, name: "Tea Coffee", category: "tea", price: 25, outOfStock: false },
+    { id: 86, name: "Milk Black Tea", category: "tea", price: 40, outOfStock: false },
+    { id: 87, name: "Milk Black Coffee", category: "tea", price: 40, outOfStock: false },
+    { id: 88, name: "Hot Chocolate", category: "tea", price: 80, outOfStock: false },
+    { id: 89, name: "Bournvita", category: "tea", price: 80, outOfStock: false },
+    { id: 90, name: "Hot Milk", category: "tea", price: 50, outOfStock: false },
+    { id: 91, name: "Masala Tea", category: "tea", price: 30, outOfStock: false },
+    { id: 92, name: "French Fry", category: "tea", price: 120, outOfStock: false },
+    { id: 93, name: "French Fries", category: "tea", price: 120, outOfStock: false },
+    { id: 94, name: "Pineapple", category: "tea", price: 120, outOfStock: false },
+    { id: 95, name: "Chickoo", category: "tea", price: 120, outOfStock: false },
+    { id: 96, name: "Rose Milk Shake", category: "tea", price: 120, outOfStock: false },
+    { id: 97, name: "Mango Milk Shake", category: "tea", price: 120, outOfStock: false },
+    { id: 98, name: "Papaya", category: "tea", price: 120, outOfStock: false },
+    { id: 99, name: "Apple", category: "tea", price: 120, outOfStock: false },
+    { id: 100, name: "Lassi", category: "tea", price: 80, outOfStock: false },
+    { id: 101, name: "Plain Lassi", category: "tea", price: 120, outOfStock: false },
+    { id: 102, name: "Mango Lassi", category: "tea", price: 120, outOfStock: false },
+    { id: 103, name: "Dry Fruits Mastani", category: "tea", price: 270, outOfStock: false },
+    { id: 104, name: "Kesar Lassi", category: "tea", price: 150, outOfStock: false },
+    { id: 105, name: "Banana Lassi", category: "tea", price: 150, outOfStock: false },
+    { id: 106, name: "Dry Fruit Milkshake", category: "tea", price: 300, outOfStock: false },
+    { id: 107, name: "Banana Peanut Butter", category: "tea", price: 200, outOfStock: false },
+    { id: 108, name: "Juice", category: "tea", price: 100, outOfStock: false },
+    { id: 109, name: "Sweet Lemon Juice", category: "tea", price: 100, outOfStock: false },
+    { id: 110, name: "Watermelon Juice", category: "tea", price: 100, outOfStock: false },
+    { id: 111, name: "Pineapple Juice", category: "tea", price: 100, outOfStock: false },
+    { id: 112, name: "Pomegranate Juice", category: "tea", price: 150, outOfStock: false },
+    { id: 113, name: "Faluda", category: "tea", price: 120, outOfStock: false },
+    { id: 114, name: "Rose Faluda", category: "tea", price: 120, outOfStock: false },
+    { id: 115, name: "Kesar Faluda", category: "tea", price: 120, outOfStock: false },
+    { id: 116, name: "Dry Fruits Faluda", category: "tea", price: 200, outOfStock: false },
+    { id: 117, name: "Royal Faluda", category: "tea", price: 200, outOfStock: false },
+    { id: 118, name: "Rolls", category: "tea", price: 120, outOfStock: false },
+    { id: 119, name: "Egg Roll", category: "tea", price: 120, outOfStock: false },
+    { id: 120, name: "Chicken Roll", category: "tea", price: 120, outOfStock: false },
+    { id: 121, name: "Paneer Tikka Roll", category: "tea", price: 120, outOfStock: false },
+  ];
+
+  // Load Menu
+  document.addEventListener('DOMContentLoaded', () => {
+    loadMenu();
+    updateCartUI();
+  });
+
+  function loadMenu() {
+    const categories = {
+      pizza: document.getElementById('pizza-menu'),
+      burger: document.getElementById('burger-menu'),
+      sandwich: document.getElementById('sandwich-menu'),
+      waffle: document.getElementById('waffle-menu'),
+      tea: document.getElementById('tea-menu')
+    };
+
+    menuData.forEach(item => {
+      if (item.outOfStock) return;
+      const div = document.createElement('div');
+      div.className = 'menu-item d-flex justify-content-between align-items-center mb-2 p-2 border rounded';
+      div.innerHTML = `
+        <span>${item.name}</span>
+        <span>₹${item.price}</span>
+        <button class="btn btn-sm btn-outline-primary" onclick="addToCart(${item.id})">+</button>
+      `;
+      categories[item.category].appendChild(div);
+    });
+  }
+
+  // Add to Cart
+  function addToCart(itemId) {
+    const item = menuData.find(i => i.id === itemId);
+    if (!item) return;
+
+    const existing = cart.find(c => c.id === itemId);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      cart.push({ ...item, qty: 1 });
+    }
+
+    updateCartUI();
+    playBuzzSound();
+  }
+
+  // Update Cart UI with +/- Buttons
+  function updateCartUI() {
+    const cartItemsDiv = document.getElementById('cart-items');
+    const cartTotalSpan = document.getElementById('cart-total');
+
+    if (cart.length === 0) {
+      cartItemsDiv.innerHTML = '<p class="text-muted">Your cart is empty.</p>';
+      cartTotalSpan.textContent = '₹0';
+      return;
+    }
+
+    let total = 0;
+    let html = '';
+
+    cart.forEach((item, index) => {
+      const itemTotal = item.price * item.qty;
+      total += itemTotal;
+      html += `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span>${item.name}</span>
+          <div class="d-flex align-items-center">
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="decreaseQty(${index})">–</button>
+            <span class="mx-2">${item.qty}</span>
+            <button class="btn btn-sm btn-outline-secondary ms-1" onclick="increaseQty(${index})">+</button>
+          </div>
+          <span>₹${itemTotal}</span>
+        </div>
+      `;
+    });
+
+    cartItemsDiv.innerHTML = html;
+    cartTotalSpan.textContent = `₹${total}`;
+  }
+
+  // Increase Quantity
+  function increaseQty(index) {
+    cart[index].qty += 1;
+    updateCartUI();
+    playBuzzSound();
+  }
+
+  // Decrease Quantity
+  function decreaseQty(index) {
+    if (cart[index].qty > 1) {
+      cart[index].qty -= 1;
+    } else {
+      cart.splice(index, 1); // Remove item if qty becomes 0
+    }
+    updateCartUI();
+    playBuzzSound();
+  }
+
+  // Place Order Button Click → Redirect to WhatsApp
+  document.getElementById('pay-button').addEventListener('click', () => {
+    const name = document.getElementById('customer-name').value.trim();
+    const phone = document.getElementById('customer-phone').value.trim();
+    const room = document.getElementById('room-number').value.trim();
+
+    if (!name || !phone || !room) {
+      alert('Please fill all fields!');
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert('Your cart is empty!');
+      return;
+    }
+
+    const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+    // Generate WhatsApp message
+    const orderDetails = cart.map(item => `${item.name} x${item.qty}`).join(', ');
+    const whatsappMsg = `ORDER PLACED: ${name} Room ${room} - ${orderDetails} Total: ₹${total}\n\nPlease confirm upon my payment ₹${total} via UPI to 9673553554@ptsbi and i will reply with screenshot order once payment is sent.`;
+
+    // Save order to Firebase (status: pending_payment)
+    const orderId = Date.now();
+    const newOrder = {
+      id: orderId,
+      customer: { name, phone, room },
+      items: cart.map(item => ({ name: item.name, price: item.price, qty: item.qty })),
+      total,
+      status: 'pending_payment',
+      timestamp: new Date().toISOString()
+    };
+
+    db.ref('orders/' + orderId).set(newOrder)
+      .then(() => {
+        console.log('Order saved to Firebase');
+      })
+      .catch(error => {
+        console.error('Error saving order:', error);
+        alert('Failed to save order. Please try again.');
+        return;
+      });
+
+    // Redirect to WhatsApp with message
+    const whatsappUrl = `https://wa.me/919673553554?text=${encodeURIComponent(whatsappMsg)}`;
+
+    window.location.href = whatsappUrl;
+
+    // Clear cart
+    cart = [];
+    updateCartUI();
+  });
+
+  // Play Buzz Sound
+  function playBuzzSound() {
+    const audio = document.getElementById('buzz-sound');
+    audio.currentTime = 0;
+    audio.play().catch(e => console.log("Audio play failed:", e));
+  }
+</script>
+</body>
+</html>
