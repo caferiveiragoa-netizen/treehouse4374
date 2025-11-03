@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Treehouse Bakery - Admin Panel</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; background-color: #fafafa; }
+    .hidden { display: none; }
+    .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .tab-content { margin-top: 20px; }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="login-box text-center">
+    <h3>🔐 Admin Login</h3>
+    <p class="text-muted">Enter your password to continue</p>
+    <input type="password" id="admin-pass" class="form-control mb-3" placeholder="Password">
+    <button class="btn btn-primary w-100" onclick="checkPassword()">Login</button>
+    <p id="login-error" class="text-danger small mt-2"></p>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="admin-panel" class="container hidden">
+    <h2 class="mb-3">Treehouse Bakery — Admin Panel</h2>
+
+    <ul class="nav nav-tabs" id="adminTabs">
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#dashboard">Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#menu">Menu</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#orders">Orders</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#reports">Reports</a></li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- DASHBOARD -->
+      <div class="tab-pane fade show active" id="dashboard">
+        <h4 class="mt-3">Dashboard Summary</h4>
+        <p>Total Orders Today: <strong id="total-orders">0</strong></p>
+        <p>Total Revenue Today: <strong id="total-revenue">₹0</strong></p>
+        <button id="day-close-btn" class="btn btn-danger">Day Close (Archive Today's Orders)</button>
+      </div>
+
+      <!-- MENU -->
+      <div class="tab-pane fade" id="menu">
+        <h4 class="mt-3">Manage Menu</h4>
+        <div class="row">
+          <div class="col-md-4">
+            <input id="edit-item-id" type="hidden">
+            <input id="item-name" class="form-control mb-2" placeholder="Item name">
+            <select id="item-category" class="form-select mb-2">
+              <option value="pizza">Pizza</option>
+              <option value="burger">Burger</option>
+              <option value="sandwich">Sandwich</option>
+              <option value="waffle">Waffle</option>
+              <option value="tea">Tea / Coffee</option>
+            </select>
+            <input id="item-price" class="form-control mb-2" placeholder="Price" type="number">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="item-out-of-stock">
+              <label class="form-check-label" for="item-out-of-stock">Out of stock</label>
+            </div>
+            <button id="save-item-btn" class="btn btn-primary w-100">Save Item</button>
+          </div>
+          <div class="col-md-8">
+            <div id="menu-list" class="list-group"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ORDERS -->
+      <div class="tab-pane fade" id="orders">
+        <h4 class="mt-3">Current Orders</h4>
+        <div id="current-orders-list" class="list-group mb-4"></div>
+
+        <h4>Past Orders</h4>
+        <div id="past-orders-list" class="list-group"></div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="tab-pane fade" id="reports">
+        <h4 class="mt-3">Daily Sales Report</h4>
+        <div id="sales-report-content" class="border bg-light p-3">Loading report...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    // --------- LOGIN SYSTEM ----------
+    const correctPassword = "tree123";
+    function checkPassword() {
+      const input = document.getElementById("admin-pass").value.trim();
+      const err = document.getElementById("login-error");
+      if (input === correctPassword) {
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("admin-panel").classList.remove("hidden");
+        initAdmin(); // start Firebase + dashboard
+      } else {
+        err.textContent = "❌ Incorrect password. Try again.";
+      }
+    }
+
+    // --------- ADMIN FUNCTIONS ----------
+    function initAdmin() {
+      const firebaseConfig = {
+      apiKey: "AIzaSyAaet1l1-eryjGpeGgMDZriQT7KEW1AlyE",
+      authDomain: "treehouse-f45df.firebaseapp.com",
+      databaseURL: "https://treehouse-f45df-default-rtdb.firebaseio.com",
+      projectId:  "treehouse-f45df",
+      storageBucket: "treehouse-f45df.firebasestorage.app",
+      messagingSenderId: "233268455151",
+      appId: "1:233268455151:web:1341a86984e416ec475d1a",
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+
+      let menuData = [];
+
+      // MENU
+      function listenMenu() {
+        db.ref('menu').on('value', snap => {
+          menuData = snap.val() ? Object.values(snap.val()) : [];
+          renderMenuList();
+        });
+      }
+      function renderMenuList() {
+        const list = document.getElementById('menu-list');
+        list.innerHTML = '';
+        if (menuData.length === 0) {
+          list.innerHTML = '<p class="p-2 text-muted">No menu items yet.</p>';
+          return;
+        }
+        menuData.forEach(i => {
+          const div = document.createElement('div');
+          div.className = 'list-group-item d-flex justify-content-between align-items-center';
+          div.innerHTML = `
+            <div><strong>${i.name}</strong> — ₹${i.price}<br><small>${i.category}${i.outOfStock ? ' • OUT OF STOCK' : ''}</small></div>
+            <div>
+              <button class="btn btn-sm btn-warning me-1" onclick="editItem(${i.id})">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteItem(${i.id})">Delete</button>
+            </div>`;
+          list.appendChild(div);
+        });
+      }
+      function saveMenuToFirebase() {
+        const updates = {};
+        menuData.forEach(i => updates['menu/' + i.id] = i);
+        db.ref().update(updates);
+      }
+      document.getElementById('save-item-btn').addEventListener('click', () => {
+        const idVal = document.getElementById('edit-item-id').value;
+        const id = idVal ? parseInt(idVal) : Date.now();
+        const name = document.getElementById('item-name').value.trim();
+        const category = document.getElementById('item-category').value;
+        const price = parseInt(document.getElementById('item-price').value) || 0;
+        const outOfStock = document.getElementById('item-out-of-stock').checked;
+        if (!name) return alert('Enter item name');
+        const obj = { id, name, category, price, outOfStock };
+        const idx = menuData.findIndex(i => i.id === id);
+        if (idx >= 0) menuData[idx] = obj; else menuData.push(obj);
+        saveMenuToFirebase(); renderMenuList();
+        document.getElementById('edit-item-id').value = '';
+        document.getElementById('item-name').value = '';
+        document.getElementById('item-price').value = '';
+        document.getElementById('item-out-of-stock').checked = false;
+      });
+      window.editItem = function(id) {
+        const i = menuData.find(m => m.id === id);
+        if (!i) return;
+        document.getElementById('edit-item-id').value = i.id;
+        document.getElementById('item-name').value = i.name;
+        document.getElementById('item-category').value = i.category;
+        document.getElementById('item-price').value = i.price;
+        document.getElementById('item-out-of-stock').checked = i.outOfStock;
+      };
+      window.deleteItem = function(id) {
+        if (!confirm('Delete this item?')) return;
+        db.ref('menu/' + id).remove();
+      };
+
+      // ORDERS
+      function renderCurrentOrders() {
+        const el = document.getElementById('current-orders-list');
+        db.ref('orders').on('value', snap => {
+          const data = snap.val();
+          if (!data) { el.innerHTML = '<p class="text-muted p-2">No current orders.</p>'; return; }
+          const arr = Object.values(data).filter(o => o.status === 'pending_payment' || o.status === 'confirmed');
+          if (arr.length === 0) { el.innerHTML = '<p class="text-muted p-2">No current orders.</p>'; return; }
+          el.innerHTML = arr.map(o => `
+            <div class="list-group-item">
+              <strong>Order #${o.id}</strong> — ${o.status}<br>
+              ${o.customer.name} | ${o.customer.room} | ${o.customer.phone}<br>
+              ${o.items.map(i => `${i.name} x${i.qty}`).join(', ')}<br>
+              Total: ₹${o.total}<br>
+              <div class="mt-2">
+                ${o.status === 'pending_payment' 
+                  ? `<button class="btn btn-sm btn-primary" onclick="confirmOrder('${o.id}')">Confirm</button>` 
+                  : `<span class="badge bg-warning text-dark">Confirmed</span>`}
+                <button class="btn btn-sm btn-info ms-1" onclick="markPaid('${o.id}')">
+                  ${o.paid ? '🟢 Paid' : 'Mark Paid'}
+                </button>
+                <button class="btn btn-sm btn-secondary ms-1" onclick="printReceipt('${o.id}')">Print</button>
+                ${o.status === 'confirmed' ? `<button class="btn btn-sm btn-success ms-1" onclick="markDelivered('${o.id}')">Mark Delivered</button>` : ''}
+              </div>
+            </div>`).join('');
+        });
+      }
+      window.confirmOrder = id => db.ref('orders/' + id).update({ status: 'confirmed' });
+      window.markDelivered = id => db.ref('orders/' + id).update({ status: 'delivered' });
+      window.markPaid = id => db.ref('orders/' + id).update({ paid: true });
+      window.printReceipt = id => {
+        db.ref('orders/' + id).once('value').then(snap => {
+          const o = snap.val(); if (!o) return alert('Order not found');
+          const html = `<h3>Treehouse Bakery</h3><p>Order #${o.id}<br>${new Date(o.timestamp).toLocaleString()}</p><hr><p>${o.customer.name} | ${o.customer.room} | ${o.customer.phone}</p><ul>${o.items.map(i => `<li>${i.name} x${i.qty} - ₹${i.qty * i.price}</li>`).join('')}</ul><hr><strong>Total: ₹${o.total}</strong><br>${o.paid ? '<span>Paid ✔</span>' : '<span>Not Paid</span>'}`;
+          const w = window.open('', '_blank', 'width=400,height=600');
+          w.document.write(html); w.document.close(); w.print();
+        });
+      };
+
+      // DASHBOARD + REPORTS
+      function renderDashboard() {
+        const totalOrdersEl = document.getElementById('total-orders');
+        const totalRevenueEl = document.getElementById('total-revenue');
+        db.ref('orders').on('value', snap => {
+          const data = snap.val() || {};
+          const today = new Date().toDateString();
+          let totalOrders = 0, totalRevenue = 0;
+          Object.values(data).forEach(o => {
+            if (o.timestamp && new Date(o.timestamp).toDateString() === today && !o.archived) {
+              totalOrders++; totalRevenue += o.total || 0;
+            }
+          });
+          totalOrdersEl.textContent = totalOrders;
+          totalRevenueEl.textContent = `₹${totalRevenue}`;
+        });
+      }
+      function renderSalesReport() {
+        const el = document.getElementById('sales-report-content');
+        db.ref('orders').on('value', snap => {
+          const data = snap.val() || {};
+          const today = new Date().toDateString();
+          const todayOrders = Object.values(data).filter(o => o.timestamp && new Date(o.timestamp).toDateString() === today);
+          if (todayOrders.length === 0) { el.innerHTML = '<p>No orders today.</p>'; return; }
+          const totalRevenue = todayOrders.reduce((s, o) => s + (o.total || 0), 0);
+          const delivered = todayOrders.filter(o => o.status === 'delivered');
+          el.innerHTML = `<p><strong>Total Orders:</strong> ${todayOrders.length}</p><p><strong>Total Revenue:</strong> ₹${totalRevenue}</p><hr><h6>Delivered Orders:</h6>${delivered.length ? '<ul>' + delivered.map(o => `<li>#${o.id} - ₹${o.total} (${o.customer.name})</li>`).join('') + '</ul>' : '<p>No delivered orders yet.</p>'}`;
+        });
+      }
+      document.getElementById('day-close-btn').addEventListener('click', () => {
+        const today = new Date().toDateString();
+        db.ref('orders').once('value').then(snap => {
+          const data = snap.val() || {};
+          const updates = {};
+          Object.keys(data).forEach(k => {
+            const o = data[k];
+            if (o.timestamp && new Date(o.timestamp).toDateString() === today && !o.archived) {
+              updates['orders/' + k + '/archived'] = true;
+            }
+          });
+          if (Object.keys(updates).length === 0) return alert('No orders to archive today.');
+          db.ref().update(updates).then(() => alert("Day closed. Today's orders archived."));
+        });
+      });
+
+      listenMenu(); renderCurrentOrders(); renderDashboard(); renderSalesReport();
+    }
+  </script>
+</body>
+</html>
