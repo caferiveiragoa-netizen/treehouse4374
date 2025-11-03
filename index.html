@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Treehouse Bakery - Order</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; }
+    .menu-item { cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-3">Treehouse Bakery — Order Online</h1>
+
+    <div class="row">
+      <div class="col-md-8">
+        <h4>Menu</h4>
+
+        <div class="mb-3">
+          <h5>Pizza</h5>
+          <div id="pizza-menu" class="menu-items"></div>
+        </div>
+
+        <div class="mb-3">
+          <h5>Burger</h5>
+          <div id="burger-menu" class="menu-items"></div>
+        </div>
+
+        <div class="mb-3">
+          <h5>Sandwich</h5>
+          <div id="sandwich-menu" class="menu-items"></div>
+        </div>
+
+        <div class="mb-3">
+          <h5>Waffle</h5>
+          <div id="waffle-menu" class="menu-items"></div>
+        </div>
+
+        <div class="mb-3">
+          <h5>Tea / Coffee</h5>
+          <div id="tea-menu" class="menu-items"></div>
+        </div>
+
+      </div>
+
+      <div class="col-md-4">
+        <h4>Cart</h4>
+        <ul id="cart-list" class="list-group mb-2"></ul>
+        <div class="mb-3">
+          <strong>Total: <span id="total-price">₹0</span></strong>
+        </div>
+
+        <h5>Customer Details</h5>
+        <div class="mb-2">
+          <input id="cust-name" class="form-control mb-2" placeholder="Name">
+          <input id="cust-room" class="form-control mb-2" placeholder="Room / Table no.">
+          <input id="cust-phone" class="form-control mb-2" placeholder="Phone number">
+        </div>
+
+        <button class="btn btn-success w-100" onclick="placeOrder()">Place Order</button>
+        <div class="mt-3 text-muted small">Orders will appear in admin panel for confirmation.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    // ---------- Firebase config: REPLACE placeholders with your real keys ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyAaet1l1-eryjGpeGgMDZriQT7KEW1AlyE",
+      authDomain: "treehouse-f45df.firebaseapp.com",
+      databaseURL: "https://treehouse-f45df-default-rtdb.firebaseio.com",
+      projectId:  "treehouse-f45df",
+      storageBucket: "treehouse-f45df.firebasestorage.app",
+      messagingSenderId: "233268455151",
+      appId: "1:233268455151:web:1341a86984e416ec475d1a",
+    };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Default menu as fallback (if DB empty)
+    const defaultMenuData = [
+      { id: 1, name: "Margherita Pizza", category: "pizza", price: 180, outOfStock: false },
+      { id: 2, name: "Farmhouse Pizza", category: "pizza", price: 220, outOfStock: false },
+      { id: 3, name: "Veggie Burger", category: "burger", price: 150, outOfStock: false },
+      { id: 4, name: "Paneer Sandwich", category: "sandwich", price: 130, outOfStock: false },
+      { id: 5, name: "Chocolate Waffle", category: "waffle", price: 160, outOfStock: false },
+      { id: 6, name: "Masala Chai", category: "tea", price: 40, outOfStock: false },
+      { id: 7, name: "Cold Coffee", category: "tea", price: 80, outOfStock: false }
+    ];
+
+    let menuData = [];
+
+    // Real-time listener for menu
+    db.ref('menu').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        // If stored as object keyed by IDs, convert to array
+        menuData = Array.isArray(val) ? val.filter(Boolean) : Object.values(val);
+        console.log('Menu loaded from Firebase', menuData);
+      } else {
+        // fallback
+        menuData = defaultMenuData.slice();
+        console.warn('Firebase menu empty — using defaultMenuData');
+      }
+      renderMenu();
+    }, err => {
+      console.error('Failed to read menu from Firebase:', err);
+      // fallback render
+      menuData = defaultMenuData.slice();
+      renderMenu();
+    });
+
+    // DOM: containers (IDs you confirmed)
+    const categories = {
+      pizza: () => document.getElementById('pizza-menu'),
+      burger: () => document.getElementById('burger-menu'),
+      sandwich: () => document.getElementById('sandwich-menu'),
+      waffle: () => document.getElementById('waffle-menu'),
+      tea: () => document.getElementById('tea-menu')
+    };
+
+    // Render menu into page
+    function renderMenu() {
+      // clear all containers
+      Object.keys(categories).forEach(k => {
+        const el = categories[k]();
+        if (el) el.innerHTML = '';
+      });
+
+      menuData.forEach(item => {
+        if (!item || item.outOfStock) return; // skip out-of-stock or invalid
+
+        const containerGetter = categories[item.category];
+        if (!containerGetter) return; // unknown category
+
+        const container = containerGetter();
+        if (!container) return;
+
+        const div = document.createElement('div');
+        div.className = 'menu-item d-flex justify-content-between align-items-center mb-2 p-2 border rounded';
+        div.innerHTML = `
+          <div>
+            <strong>${escapeHtml(item.name)}</strong><br>
+            <small class="text-muted">${escapeHtml(item.category)}</small>
+          </div>
+          <div class="d-flex align-items-center">
+            <span class="me-3">₹${Number(item.price||0)}</span>
+            <button class="btn btn-sm btn-outline-primary" onclick="addToCart(${item.id})">+</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Simple escape to avoid accidental HTML injection (good practice)
+    function escapeHtml(s) {
+      if (s === undefined || s === null) return '';
+      return String(s).replace(/[&<>"']/g, function(m) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+      });
+    }
+
+    // Cart logic
+    let cart = [];
+
+    function addToCart(id) {
+      const item = menuData.find(i => i.id === id);
+      if (!item) {
+        alert('Item not found or out of stock.');
+        return;
+      }
+      const existing = cart.find(c => c.id === id);
+      if (existing) existing.qty++;
+      else cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });
+      renderCart();
+    }
+
+    function removeFromCart(id) {
+      const idx = cart.findIndex(c => c.id === id);
+      if (idx === -1) return;
+      cart[idx].qty--;
+      if (cart[idx].qty <= 0) cart.splice(idx, 1);
+      renderCart();
+    }
+
+    function renderCart() {
+      const list = document.getElementById('cart-list');
+      const totalEl = document.getElementById('total-price');
+      list.innerHTML = '';
+      let total = 0;
+      cart.forEach(item => {
+        total += (item.price || 0) * item.qty;
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.innerHTML = `
+          <div>${escapeHtml(item.name)} x${item.qty}</div>
+          <div>
+            <button class="btn btn-sm btn-danger me-1" onclick="removeFromCart(${item.id})">-</button>
+            <span>₹${(item.price||0)*item.qty}</span>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+      totalEl.innerText = '₹' + total;
+    }
+
+    // Place order into Firebase
+    function placeOrder() {
+      if (cart.length === 0) {
+        alert('Cart is empty.');
+        return;
+      }
+      const name = document.getElementById('cust-name').value.trim();
+      const room = document.getElementById('cust-room').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      if (!name || !room || !phone) {
+        alert('Please fill Name, Room and Phone.');
+        return;
+      }
+
+      const orderId = Date.now().toString();
+      const total = cart.reduce((s,i)=> s + (i.price||0)*i.qty, 0);
+      const order = {
+        id: orderId,
+        customer: { name, room, phone },
+        items: cart,
+        total,
+        timestamp: new Date().toISOString(),
+        status: 'pending_payment',
+        archived: false
+      };
+
+      db.ref('orders/' + orderId).set(order)
+        .then(() => {
+          alert('Order placed. Admin will confirm shortly.');
+          cart = [];
+          renderCart();
+          document.getElementById('cust-name').value = '';
+          document.getElementById('cust-room').value = '';
+          document.getElementById('cust-phone').value = '';
+        })
+        .catch(err => {
+          console.error('Place order failed', err);
+          alert('Failed to place order. Try again.');
+        });
+    }
+
+    // Ensure page loads something initially
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMenu();
+      renderCart();
+    });
+  </script>
+</body>
+</html>
