@@ -1,0 +1,276 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Treehouse Bakery - Order Online</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 12px; background-color: #fafafa; }
+    .menu-section { margin-bottom: 12px; }
+    .menu-item { border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fff; }
+    .cart-box { background: #fff; border-radius: 10px; padding: 12px; box-shadow: 0 0 8px rgba(0,0,0,0.06); }
+    .section-title { border-bottom: 2px solid #f1f1f1; margin-bottom: 8px; padding-bottom: 6px; }
+    @media (max-width: 767px) {
+      .desktop-hide { display: none !important; }
+      .cart-box { margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="mb-3 text-center">🍰 Treehouse Bakery — Order Online</h2>
+
+    <div class="row">
+      <!-- MENU SECTION -->
+      <div class="col-lg-8">
+        <div id="menu-area">
+          <div class="accordion" id="menuAccordion">
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingPizza">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePizza" aria-expanded="false" aria-controls="collapsePizza">
+                  🍕 Pizza
+                </button>
+              </h2>
+              <div id="collapsePizza" class="accordion-collapse collapse" aria-labelledby="headingPizza" data-bs-parent="#menuAccordion">
+                <div class="accordion-body" id="pizza-menu"></div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingBurger">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBurger" aria-expanded="false" aria-controls="collapseBurger">
+                  🍔 Burgers
+                </button>
+              </h2>
+              <div id="collapseBurger" class="accordion-collapse collapse" aria-labelledby="headingBurger" data-bs-parent="#menuAccordion">
+                <div class="accordion-body" id="burger-menu"></div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingSandwich">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSandwich" aria-expanded="false" aria-controls="collapseSandwich">
+                  🥪 Sandwiches
+                </button>
+              </h2>
+              <div id="collapseSandwich" class="accordion-collapse collapse" aria-labelledby="headingSandwich" data-bs-parent="#menuAccordion">
+                <div class="accordion-body" id="sandwich-menu"></div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingWaffle">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseWaffle" aria-expanded="false" aria-controls="collapseWaffle">
+                  🧇 Waffles
+                </button>
+              </h2>
+              <div id="collapseWaffle" class="accordion-collapse collapse" aria-labelledby="headingWaffle" data-bs-parent="#menuAccordion">
+                <div class="accordion-body" id="waffle-menu"></div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingTea">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTea" aria-expanded="false" aria-controls="collapseTea">
+                  ☕ Tea / Coffee
+                </button>
+              </h2>
+              <div id="collapseTea" class="accordion-collapse collapse" aria-labelledby="headingTea" data-bs-parent="#menuAccordion">
+                <div class="accordion-body" id="tea-menu"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- CART SECTION -->
+      <div class="col-lg-4">
+        <div class="cart-box">
+          <h4>🛒 Your Cart</h4>
+          <ul id="cart-list" class="list-group mb-2"></ul>
+          <div class="mb-3"><strong>Total: <span id="total-price">₹0</span></strong></div>
+
+          <h5>Customer Details</h5>
+          <input id="cust-name" class="form-control mb-2" placeholder="Your name">
+          <input id="cust-room" class="form-control mb-2" placeholder="Room / Table no.">
+          <input id="cust-phone" class="form-control mb-3" placeholder="Phone number">
+
+          <button class="btn btn-success w-100" onclick="placeOrder()">Place Order</button>
+          <p class="text-muted small mt-2">You’ll receive confirmation from the café once your order is placed.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    // ---------- Firebase config (same as before) ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyAaet1l1-eryjGpeGgMDZriQT7KEW1AlyE",
+      authDomain: "treehouse-f45df.firebaseapp.com",
+      databaseURL: "https://treehouse-f45df-default-rtdb.firebaseio.com",
+      projectId:  "treehouse-f45df",
+      storageBucket: "treehouse-f45df.firebasestorage.app",
+      messagingSenderId: "233268455151",
+      appId: "1:233268455151:web:1341a86984e416ec475d1a",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const defaultMenuData = [
+      { id: 1, name: "Margherita Pizza", category: "pizza", price: 180, outOfStock: false },
+      { id: 2, name: "Veggie Burger", category: "burger", price: 150, outOfStock: false },
+      { id: 3, name: "Paneer Sandwich", category: "sandwich", price: 130, outOfStock: false },
+      { id: 4, name: "Chocolate Waffle", category: "waffle", price: 160, outOfStock: false },
+      { id: 5, name: "Masala Chai", category: "tea", price: 40, outOfStock: false },
+      { id: 6, name: "Cold Coffee", category: "tea", price: 80, outOfStock: false }
+    ];
+
+    let menuData = [];
+    let cart = [];
+
+    db.ref("menu").on("value", (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        menuData = Object.values(data);
+      } else {
+        menuData = defaultMenuData.slice();
+      }
+      renderMenu();
+    });
+
+    function renderMenu() {
+      const cats = {
+        pizza: document.getElementById("pizza-menu"),
+        burger: document.getElementById("burger-menu"),
+        sandwich: document.getElementById("sandwich-menu"),
+        waffle: document.getElementById("waffle-menu"),
+        tea: document.getElementById("tea-menu")
+      };
+      Object.values(cats).forEach(el => el.innerHTML = "");
+      menuData.forEach(item => {
+        if (item.outOfStock) return;
+        const div = document.createElement("div");
+        div.className = "menu-item d-flex justify-content-between align-items-center";
+        div.innerHTML = `
+          <div>
+            <strong>${item.name}</strong><br>
+            <small>₹${item.price}</small>
+          </div>
+          <div>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="addToCart(${item.id})">Add</button>
+          </div>
+        `;
+        if (cats[item.category]) cats[item.category].appendChild(div);
+      });
+    }
+
+    function addToCart(id) {
+      const item = menuData.find(i => i.id === id);
+      if (!item) return;
+      const existing = cart.find(c => c.id === id);
+      if (existing) existing.qty++;
+      else cart.push({ ...item, qty: 1 });
+      renderCart();
+    }
+
+    function removeFromCart(id) {
+      const idx = cart.findIndex(c => c.id === id);
+      if (idx === -1) return;
+      cart[idx].qty--;
+      if (cart[idx].qty <= 0) cart.splice(idx, 1);
+      renderCart();
+    }
+
+    function renderCart() {
+      const list = document.getElementById("cart-list");
+      const totalEl = document.getElementById("total-price");
+      list.innerHTML = "";
+      let total = 0;
+      cart.forEach(item => {
+        total += item.price * item.qty;
+        const li = document.createElement("li");
+        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.innerHTML = `
+          ${item.name} x${item.qty}
+          <div>
+            <button class="btn btn-sm btn-danger" onclick="removeFromCart(${item.id})">-</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+      totalEl.innerText = "₹" + total;
+    }
+
+    function placeOrder() {
+      if (cart.length === 0) return alert("Cart is empty!");
+      const name = document.getElementById("cust-name").value.trim();
+      const room = document.getElementById("cust-room").value.trim();
+      const phone = document.getElementById("cust-phone").value.trim();
+      if (!name || !room || !phone) return alert("Please fill all details!");
+
+      const orderId = Date.now().toString();
+      const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+      const order = {
+        id: orderId,
+        customer: { name, room, phone },
+        items: cart,
+        total,
+        timestamp: Date.now(),
+        status: "pending_payment",
+        archived: false
+      };
+
+      db.ref("orders/" + orderId).set(order)
+        .then(() => {
+          alert("✅ Order placed successfully! Wait for confirmation.");
+          cart = [];
+          renderCart();
+          document.getElementById("cust-name").value = "";
+          document.getElementById("cust-room").value = "";
+          document.getElementById("cust-phone").value = "";
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Error placing order.");
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => renderMenu());
+  </script>
+
+  <!-- bootstrap JS (fixes accordion behavior) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <footer class="text-center mt-3">
+    <a href="admin.html" class="text-secondary small text-decoration-none">
+      🔐 Admin Login
+    </a>
+  </footer>
+  <script>
+    // Function to read ?table= from the URL
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+  
+    // Autofill the table number input when the page loads
+    document.addEventListener("DOMContentLoaded", () => {
+      const tableNumber = getQueryParam("table");
+      if (tableNumber) {
+        const tableInput = document.querySelector('input[placeholder="Room / Table no."]');
+        if (tableInput) {
+          tableInput.value = `Table ${tableNumber}`;
+        }
+      }
+    });
+  </script>
+  
+</body>
+</html>
